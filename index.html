@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meraki Migration Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Light Theme */
+        --color-bg: #f6f8fa;
+        --color-surface: #ffffff;
+        --color-surface-subtle: #f0f2f5;
+        --color-text-primary: #24292e;
+        --color-text-secondary: #586069;
+        --color-text-tertiary: #6a737d;
+        --color-border-primary: #d1d5da;
+        --color-primary: #0366d6;
+        --color-primary-hover: #005cc5;
+        --color-user-message-bg: #ddf4ff;
+
+        /* Structural and layout variables */
+        --radius-sm: 0.25rem;
+        --radius-md: 0.5rem;
+        --radius-lg: 0.75rem;
+        --radius-xl: 1rem;
+        --radius-2xl: 1.5rem;
+
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        --shadow-bevel: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-bevel-deep: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+
+        --duration-fast: 150ms;
+        --duration-normal: 300ms;
+        --ease-out: cubic-bezier(0, 0, 0.2, 1);
+      }
+
+      html, body {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      body {
+        background-color: var(--color-bg);
+        color: var(--color-text-primary);
+        position: relative;
+        min-height: 100vh;
+      }
+      
+      .background-animation {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        overflow: hidden;
+      }
+
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+        opacity: 0.5;
+        filter: blur(100px);
+        will-change: transform;
+      }
+
+      .color-1 {
+        width: 50vw;
+        height: 50vw;
+        max-width: 600px;
+        max-height: 600px;
+        top: 5vh;
+        left: 10vw;
+        background: #ccebff;
+        animation: move-1 25s infinite alternate ease-in-out;
+      }
+      
+      .color-2 {
+        width: 60vw;
+        height: 60vw;
+        max-width: 800px;
+        max-height: 800px;
+        top: 40vh;
+        left: 50vw;
+        background: #d1d8ff;
+        animation: move-2 35s infinite alternate-reverse ease-in-out -5s;
+      }
+      
+      .color-3 {
+        width: 40vw;
+        height: 40vw;
+        max-width: 500px;
+        max-height: 500px;
+        top: 60vh;
+        left: 5vw;
+        background: #e9d8ff;
+        animation: move-3 30s infinite alternate ease-in-out -10s;
+      }
+
+      @keyframes move-1 {
+        to { transform: translate(15vw, 10vh) scale(1.1); }
+      }
+      @keyframes move-2 {
+        to { transform: translate(-20vw, -15vh) scale(0.9); }
+      }
+      @keyframes move-3 {
+        to { transform: translate(25vw, -5vh) scale(1.2); }
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      .animate-fade-in { animation: fadeIn var(--duration-normal) var(--ease-out) forwards; }
+      .animate-fade-slide-up { animation: fadeSlideUp var(--duration-normal) var(--ease-out) forwards; }
+      .animate-scale-in { animation: scaleIn var(--duration-fast) var(--ease-out) forwards; }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^18.2.0/",
+    "react": "https://aistudiocdn.com/react@^18.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.19.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "http": "https://aistudiocdn.com/http@^0.0.1-security",
+    "ws": "https://aistudiocdn.com/ws@^8.18.3",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "dotenv": "https://aistudiocdn.com/dotenv@^17.2.3",
+    "recharts": "https://aistudiocdn.com/recharts@^2.12.7",
+    "jszip": "https://aistudiocdn.com/jszip@^3.10.1",
+    "node-fetch": "https://aistudiocdn.com/node-fetch@^3.3.2",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.546.0",
+    "clsx": "https://aistudiocdn.com/clsx@^2.1.1",
+    "tailwind-merge": "https://aistudiocdn.com/tailwind-merge@^2.4.0",
+    "@radix-ui/react-slot": "https://aistudiocdn.com/@radix-ui/react-slot@^1.2.3",
+    "class-variance-authority": "https://aistudiocdn.com/class-variance-authority@^0.7.1",
+    "embla-carousel-react": "https://aistudiocdn.com/embla-carousel-react@^8.6.0",
+    "react-day-picker": "https://aistudiocdn.com/react-day-picker@^9.11.1",
+    "next-themes": "https://aistudiocdn.com/next-themes@^0.4.6",
+    "input-otp": "https://aistudiocdn.com/input-otp@^1.4.2",
+    "sonner": "https://aistudiocdn.com/sonner@^2.0.7",
+    "@radix-ui/react-accordion": "https://aistudiocdn.com/@radix-ui/react-accordion@^1.2.12",
+    "react-resizable-panels": "https://aistudiocdn.com/react-resizable-panels@^3.0.6",
+    "@radix-ui/react-switch": "https://aistudiocdn.com/@radix-ui/react-switch@^1.2.6",
+    "@radix-ui/react-select": "https://aistudiocdn.com/@radix-ui/react-select@^2.2.6",
+    "@radix-ui/react-slider": "https://aistudiocdn.com/@radix-ui/react-slider@^1.3.6",
+    "@radix-ui/react-label": "https://aistudiocdn.com/@radix-ui/react-label@^2.1.7",
+    "react-hook-form": "https://aistudiocdn.com/react-hook-form@^7.65.0",
+    "@radix-ui/react-tabs": "https://aistudiocdn.com/@radix-ui/react-tabs@^1.1.13",
+    "@radix-ui/react-toggle-group": "https://aistudiocdn.com/@radix-ui/react-toggle-group@^1.1.11",
+    "@radix-ui/react-tooltip": "https://aistudiocdn.com/@radix-ui/react-tooltip@^1.2.8",
+    "@radix-ui/react-checkbox": "https://aistudiocdn.com/@radix-ui/react-checkbox@^1.3.3",
+    "@radix-ui/react-dialog": "https://aistudiocdn.com/@radix-ui/react-dialog@^1.1.15",
+    "@radix-ui/react-collapsible": "https://aistudiocdn.com/@radix-ui/react-collapsible@^1.1.12",
+    "@radix-ui/react-popover": "https://aistudiocdn.com/@radix-ui/react-popover@^1.1.15",
+    "@radix-ui/react-alert-dialog": "https://aistudiocdn.com/@radix-ui/react-alert-dialog@^1.1.15",
+    "@radix-ui/react-scroll-area": "https://aistudiocdn.com/@radix-ui/react-scroll-area@^1.2.10",
+    "@radix-ui/react-hover-card": "https://aistudiocdn.com/@radix-ui/react-hover-card@^1.1.15",
+    "cmdk": "https://aistudiocdn.com/cmdk@^1.1.1",
+    "@radix-ui/react-navigation-menu": "https://aistudiocdn.com/@radix-ui/react-navigation-menu@^1.2.14",
+    "@radix-ui/react-progress": "https://aistudiocdn.com/@radix-ui/react-progress@^1.1.7",
+    "vaul": "https://aistudiocdn.com/vaul@^1.1.2",
+    "@radix-ui/react-avatar": "https://aistudiocdn.com/@radix-ui/react-avatar@^1.1.10",
+    "@radix-ui/react-aspect-ratio": "https://aistudiocdn.com/@radix-ui/react-aspect-ratio@^1.1.7",
+    "@radix-ui/react-context-menu": "https://aistudiocdn.com/@radix-ui/react-context-menu@^2.2.16",
+    "@radix-ui/react-toggle": "https://aistudiocdn.com/@radix-ui/react-toggle@^1.1.10",
+    "@radix-ui/react-separator": "https://aistudiocdn.com/@radix-ui/react-separator@^1.1.7",
+    "@radix-ui/react-dropdown-menu": "https://aistudiocdn.com/@radix-ui/react-dropdown-menu@^2.1.16",
+    "@radix-ui/react-menubar": "https://aistudiocdn.com/@radix-ui/react-menubar@^1.1.16",
+    "@radix-ui/react-radio-group": "https://aistudiocdn.com/@radix-ui/react-radio-group@^1.3.8",
+    "https": "https://aistudiocdn.com/https@^1.0.0",
+    "url": "https://aistudiocdn.com/url@^0.11.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div class="background-animation">
+      <div class="blob color-1"></div>
+      <div class="blob color-2"></div>
+      <div class="blob color-3"></div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
