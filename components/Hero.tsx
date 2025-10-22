@@ -1,14 +1,9 @@
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { ArrowRight, CheckCircle2, Zap, Shield } from "lucide-react";
-import { ImageWithFallback } from "../figma/ImageWithFallback";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
 
-export function Hero(props:any) {
-  const startOtherApp = async () => {
-    props.setIsHome(false)
-  };
-
-
+export function Hero() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Animated gradient background */}
@@ -25,13 +20,13 @@ export function Hero(props:any) {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl text-gray-900">Migrate Meraki</span>
+            <span className="text-xl text-gray-900">MerakiMigrate</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</a>
             <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
             <a href="#how" className="text-gray-600 hover:text-gray-900 transition-colors">How it Works</a>
-            <Button variant="outline" className="border-gray-300 text-gray-900 hover:bg-gray-50" onClick={startOtherApp}>
+            <Button variant="outline" className="border-gray-300 text-gray-900 hover:bg-gray-50">
               Get Started
             </Button>
           </div>
@@ -80,7 +75,7 @@ export function Hero(props:any) {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg" onClick={startOtherApp}>
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg">
                 Start Migration <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
               <Button size="lg" variant="outline" className="border-gray-300 text-gray-900 hover:bg-gray-50">
@@ -113,7 +108,7 @@ export function Hero(props:any) {
             <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl border border-gray-200 p-8 shadow-2xl">
               <div className="aspect-video rounded-xl overflow-hidden mb-6 bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200">
                 <ImageWithFallback
-                  src="https://phoenixnap.com/glossary/wp-content/uploads/2024/03/what-is-a-computer-rack.jpg"
+                  src="https://images.unsplash.com/photo-1760013767150-da8e4ded6286?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxuZXR3b3JrJTIwaW5mcmFzdHJ1Y3R1cmUlMjB0ZWNobm9sb2d5fGVufDF8fHx8MTc2MDY1NjEwN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
                   alt="Network infrastructure"
                   className="w-full h-full object-cover opacity-90"
                 />

@@ -290,7 +290,8 @@ export const updateNetworkWirelessSsidFirewallL7Rules = (apiKey: string, r: 'com
 export const getNetworkWirelessSsidTrafficShapingRules = (apiKey: string, r: 'com'|'in', nid: string, ssidNum: number): Promise<SsidTrafficShapingRules> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/ssids/${ssidNum}/trafficShaping/rules`);
 export const updateNetworkWirelessSsidTrafficShapingRules = (apiKey: string, r: 'com'|'in', nid: string, ssidNum: number, body: SsidTrafficShapingRules): Promise<any> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/ssids/${ssidNum}/trafficShaping/rules`, 'PUT', body);
 export const getNetworkWirelessRfProfiles = (apiKey: string, r: 'com'|'in', nid: string): Promise<RfProfile[]> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/rfProfiles`);
-export const createNetworkWirelessRfProfile = (apiKey: string, r: 'com'|'in', nid: string, body: RfProfile): Promise<any> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/rfProfiles`, 'POST', body);
+// FIX: Changed 'body: RfProfile' to 'body: Omit<RfProfile, 'id'>' to allow creating a new profile without providing an ID.
+export const createNetworkWirelessRfProfile = (apiKey: string, r: 'com'|'in', nid: string, body: Omit<RfProfile, 'id'>): Promise<any> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/rfProfiles`, 'POST', body);
 export const getNetworkWirelessBluetoothSettings = (apiKey: string, r: 'com'|'in', nid: string): Promise<WirelessBluetoothSettings> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/bluetooth/settings`);
 export const updateNetworkWirelessBluetoothSettings = (apiKey: string, r: 'com'|'in', nid: string, body: WirelessBluetoothSettings): Promise<any> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/bluetooth/settings`, 'PUT', body);
 export const getNetworkWirelessSettings = (apiKey: string, r: 'com'|'in', nid: string): Promise<WirelessSettings> => fetchWithMerakiApi(apiKey, r, `/networks/${nid}/wireless/settings`);
@@ -336,17 +337,87 @@ export const createSelectiveBackup = async (
     logCallback(`Found ${networkIds.length} unique networks to back up.`);
 
     for (const networkId of networkIds) {
+        if (!networkId) continue;
         logCallback(`--- Backing up Network ID: ${networkId} ---`);
         try {
-            // Fetch a subset of network configs
-            const [groupPolicies, ssids, applianceVlans, l3FirewallRules, siteToSiteVpn] = await Promise.all([
-                getNetworkGroupPolicies(apiKey, region, networkId as string).catch(() => null),
-                getNetworkWirelessSsids(apiKey, region, networkId as string).catch(() => null),
-                getNetworkApplianceVlans(apiKey, region, networkId as string).catch(() => null),
-                getNetworkApplianceFirewallL3FirewallRules(apiKey, region, networkId as string).catch(() => null),
-                getNetworkApplianceVpnSiteToSiteVpn(apiKey, region, networkId as string).catch(() => null)
+            // Fetch a wide range of network configs
+            const [
+                groupPolicies,
+                ssids,
+                applianceVlans,
+                l3FirewallRules,
+                siteToSiteVpn,
+                syslogServersResponse,
+                snmp,
+                staticRoutes,
+                l7FirewallRules,
+                intrusionSettings,
+                malwareSettings,
+                switchAcls,
+                switchSettings,
+                wirelessRfProfiles,
+            ] = await Promise.all([
+                getNetworkGroupPolicies(apiKey, region, networkId).catch(() => null),
+                getNetworkWirelessSsids(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceVlans(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceFirewallL3FirewallRules(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceVpnSiteToSiteVpn(apiKey, region, networkId).catch(() => null),
+                getNetworkSyslogServers(apiKey, region, networkId).catch(() => null),
+                getNetworkSnmp(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceStaticRoutes(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceFirewallL7FirewallRules(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceSecurityIntrusion(apiKey, region, networkId).catch(() => null),
+                getNetworkApplianceSecurityMalware(apiKey, region, networkId).catch(() => null),
+                getNetworkSwitchAccessControlLists(apiKey, region, networkId).catch(() => null),
+                getNetworkSwitchSettings(apiKey, region, networkId).catch(() => null),
+                getNetworkWirelessRfProfiles(apiKey, region, networkId).catch(() => null),
             ]);
-            backupFile.networkConfigs![networkId as string] = { groupPolicies, ssids, applianceVlans, applianceL3FirewallRules: l3FirewallRules, siteToSiteVpnSettings: siteToSiteVpn };
+            
+            const syslogServers = syslogServersResponse?.servers || null;
+
+            const networkBackup: Partial<NetworkConfigBackup> = {
+                groupPolicies,
+                ssids,
+                applianceVlans,
+                applianceL3FirewallRules: l3FirewallRules,
+                siteToSiteVpnSettings: siteToSiteVpn,
+                syslogServers,
+                snmp,
+                staticRoutes,
+                applianceL7FirewallRules: l7FirewallRules,
+                intrusionSettings,
+                malwareSettings,
+                switchAcls,
+                switchSettings,
+                wirelessRfProfiles,
+            };
+
+            // Fetch per-SSID data
+            if (ssids && ssids.length > 0) {
+                logCallback(`    - Found ${ssids.length} SSIDs. Backing up their specific rules...`);
+                const ssidL3Rules: Record<number, SsidFirewallL3Rules> = {};
+                const ssidL7Rules: Record<number, SsidFirewallL7Rules> = {};
+                const ssidTrafficShaping: Record<number, SsidTrafficShapingRules> = {};
+
+                const ssidPromises = ssids.map(async (ssid) => {
+                    const [l3, l7, ts] = await Promise.all([
+                        getNetworkWirelessSsidFirewallL3Rules(apiKey, region, networkId, ssid.number).catch(() => null),
+                        getNetworkWirelessSsidFirewallL7Rules(apiKey, region, networkId, ssid.number).catch(() => null),
+                        getNetworkWirelessSsidTrafficShapingRules(apiKey, region, networkId, ssid.number).catch(() => null)
+                    ]);
+                    if (l3) ssidL3Rules[ssid.number] = l3;
+                    if (l7) ssidL7Rules[ssid.number] = l7;
+                    if (ts) ssidTrafficShaping[ssid.number] = ts;
+                });
+
+                await Promise.all(ssidPromises);
+                networkBackup.ssidFirewallL3Rules = ssidL3Rules;
+                networkBackup.ssidFirewallL7Rules = ssidL7Rules;
+                networkBackup.ssidTrafficShaping = ssidTrafficShaping;
+            }
+
+            backupFile.networkConfigs![networkId] = networkBackup;
+
             logCallback(`  - ✅ Network ${networkId} configs backed up.`);
         } catch (e) {
             logCallback(`  - ❌ FAILED to back up network ${networkId}: ${getErrorMessage(e)}`);
@@ -630,7 +701,7 @@ export const restoreNetworkConfiguration = async (
     
     // Helper to run and log a restore operation
     const runRestore = async (name: string, backupData: any, restoreFn: () => Promise<any>) => {
-        if (backupData && (!Array.isArray(backupData) || backupData.length > 0)) {
+        if (backupData && (!Array.isArray(backupData) || backupData.length > 0) && Object.keys(backupData).length > 0) {
             log(`  - Restoring ${name}...`);
             try {
                 await restoreFn();
@@ -644,34 +715,83 @@ export const restoreNetworkConfiguration = async (
         }
     };
 
-    // --- Restore Network-level settings ---
-    await runRestore('VLANs', networkConfig.applianceVlans, async () => {
+    // Restore VLANs first as other settings may depend on them
+    await runRestore('Appliance VLANs', networkConfig.applianceVlans, async () => {
         if (networkConfig.applianceVlans) {
             for (const vlan of networkConfig.applianceVlans) {
-                // Destructure to remove properties that can't be in the POST body
                 const { id, networkId: sourceNetId, ...vlanData } = vlan;
-                // Don't try to create VLAN 1, it always exists
-                if (String(id) !== "1") {
+                if (String(id) !== "1") { // Don't try to create VLAN 1
                     await createNetworkApplianceVlan(apiKey, region, networkId, vlanData);
                 }
             }
         }
     });
+    
+    // General Network
+    await runRestore('Syslog Servers', networkConfig.syslogServers, () => 
+        updateNetworkSyslogServers(apiKey, region, networkId, { servers: networkConfig.syslogServers! })
+    );
 
+    await runRestore('Network SNMP Settings', networkConfig.snmp, () => 
+        updateNetworkSnmp(apiKey, region, networkId, networkConfig.snmp!)
+    );
+
+    // Appliance
     await runRestore('L3 Firewall Rules', networkConfig.applianceL3FirewallRules, () =>
         updateNetworkApplianceFirewallL3FirewallRules(apiKey, region, networkId, networkConfig.applianceL3FirewallRules!)
+    );
+
+    await runRestore('L7 Firewall Rules', networkConfig.applianceL7FirewallRules, () =>
+        updateNetworkApplianceFirewallL7FirewallRules(apiKey, region, networkId, networkConfig.applianceL7FirewallRules!)
     );
 
     await runRestore('Site-to-Site VPN', networkConfig.siteToSiteVpnSettings, () =>
         updateNetworkApplianceVpnSiteToSiteVpn(apiKey, region, networkId, networkConfig.siteToSiteVpnSettings!)
     );
+
+    await runRestore('Intrusion Detection/Prevention', networkConfig.intrusionSettings, () =>
+        updateNetworkApplianceSecurityIntrusion(apiKey, region, networkId, networkConfig.intrusionSettings!)
+    );
+
+    await runRestore('Malware Protection', networkConfig.malwareSettings, () =>
+        updateNetworkApplianceSecurityMalware(apiKey, region, networkId, networkConfig.malwareSettings!)
+    );
+
+    await runRestore('Appliance Static Routes', networkConfig.staticRoutes, async () => {
+        if (networkConfig.staticRoutes) {
+            for (const route of networkConfig.staticRoutes) {
+                const { id, networkId: sourceNetId, ...routeData } = route;
+                await createNetworkApplianceStaticRoute(apiKey, region, networkId, routeData);
+            }
+        }
+    });
+
+    // Switch
+    await runRestore('Switch Settings', networkConfig.switchSettings, () =>
+        updateNetworkSwitchSettings(apiKey, region, networkId, networkConfig.switchSettings!)
+    );
+
+    await runRestore('Switch ACLs', networkConfig.switchAcls, () =>
+        updateNetworkSwitchAccessControlLists(apiKey, region, networkId, networkConfig.switchAcls!)
+    );
     
-    // Restore Group Policies
+    // Wireless
+    await runRestore('Wireless RF Profiles', networkConfig.wirelessRfProfiles, async () => {
+        if (networkConfig.wirelessRfProfiles) {
+            for (const profile of networkConfig.wirelessRfProfiles) {
+                const { id, networkId: sourceNetId, ...profileData } = profile;
+                if (profileData.name) {
+                    await createNetworkWirelessRfProfile(apiKey, region, networkId, profileData);
+                }
+            }
+        }
+    });
+
+    // Restore Group Policies (these may be referenced by other settings)
     if (networkConfig.groupPolicies && networkConfig.groupPolicies.length > 0) {
         log(`  - Restoring ${networkConfig.groupPolicies.length} Group Policies...`);
         for (const policy of networkConfig.groupPolicies) {
             try {
-                // Remove the ID as we need to create a new one
                 const { groupPolicyId, ...policyData } = policy;
                 await createNetworkGroupPolicy(apiKey, region, networkId, policyData);
                 log(`    ✅ Group Policy "${policy.name}" restored.`);
@@ -682,20 +802,29 @@ export const restoreNetworkConfiguration = async (
         }
     }
     
-    // Restore SSIDs
+    // Restore SSIDs and their associated rules
     if (networkConfig.ssids && networkConfig.ssids.length > 0) {
         log(`  - Restoring ${networkConfig.ssids.length} SSIDs...`);
-        // First, fetch existing SSIDs in the destination to see which ones we can update
         const destSsids = await getNetworkWirelessSsids(apiKey, region, networkId);
 
         for (const ssid of networkConfig.ssids) {
             try {
-                // Find a matching SSID number in the destination
                 const destSsid = destSsids.find(ds => ds.number === ssid.number);
                 if (destSsid) {
                     await updateNetworkWirelessSsid(apiKey, region, networkId, ssid.number, ssid);
-                    log(`    ✅ SSID "${ssid.name}" (Number: ${ssid.number}) updated successfully.`);
+                    log(`    ✅ SSID "${ssid.name}" (Number: ${ssid.number}) base settings updated.`);
                     successCount++;
+
+                    // Restore rules for this SSID
+                    const l3Rules = networkConfig.ssidFirewallL3Rules?.[ssid.number];
+                    if (l3Rules) await runRestore(`L3 Firewall Rules for SSID ${ssid.number}`, l3Rules, () => updateNetworkWirelessSsidFirewallL3Rules(apiKey, region, networkId, ssid.number, l3Rules));
+                    
+                    const l7Rules = networkConfig.ssidFirewallL7Rules?.[ssid.number];
+                    if (l7Rules) await runRestore(`L7 Firewall Rules for SSID ${ssid.number}`, l7Rules, () => updateNetworkWirelessSsidFirewallL7Rules(apiKey, region, networkId, ssid.number, l7Rules));
+                    
+                    const tsRules = networkConfig.ssidTrafficShaping?.[ssid.number];
+                    if (tsRules) await runRestore(`Traffic Shaping for SSID ${ssid.number}`, tsRules, () => updateNetworkWirelessSsidTrafficShapingRules(apiKey, region, networkId, ssid.number, tsRules));
+
                 } else {
                     log(`    ⚠️ Could not find a destination SSID with number ${ssid.number} to update.`);
                 }
@@ -706,4 +835,133 @@ export const restoreNetworkConfiguration = async (
     }
 
     return successCount;
+};
+
+// --- New Function to Parse Full Backup ZIP ---
+export const parseBackupZip = async (zipFile: File, log: (msg: string) => void): Promise<BackupFile> => {
+    log("--- Starting backup file analysis ---");
+    const zip = await JSZip.loadAsync(zipFile);
+    log("  - ✅ ZIP file loaded successfully.");
+
+    const backup: Partial<BackupFile> = {
+        createdAt: new Date().toISOString(),
+        devices: [],
+        networkConfigs: {},
+        organizationConfig: {},
+    };
+
+    // Helper to safely read and parse a JSON file from the zip
+    const readJson = async <T>(path: string): Promise<T | null> => {
+        const file = zip.file(path);
+        if (file) {
+            try {
+                const content = await file.async('string');
+                return JSON.parse(content) as T;
+            } catch (e) {
+                log(`  - ⚠️ Could not parse JSON from ${path}: ${e instanceof Error ? e.message : String(e)}`);
+                return null;
+            }
+        }
+        return null;
+    };
+
+    // 1. Get Organization Details
+    const orgDetails = await readJson<MerakiOrganization>('organization/details.json');
+    if (!orgDetails) throw new Error("Could not find 'organization/details.json' in the backup file. Is this a valid backup?");
+    backup.sourceOrgId = orgDetails.id;
+    backup.sourceOrgName = orgDetails.name;
+    log(`  - Found source organization: ${orgDetails.name}`);
+
+    // 2. Get Device Configurations
+    const deviceFiles = zip.folder('devices');
+    if (deviceFiles) {
+        log("  - Scanning for device configurations...");
+        const deviceFolders: string[] = [];
+        deviceFiles.forEach((relativePath) => {
+            const pathParts = relativePath.split('/');
+            if (pathParts.length > 1 && pathParts[0] && !deviceFolders.includes(pathParts[0])) {
+                deviceFolders.push(pathParts[0]);
+            }
+        });
+
+        for (const folderName of deviceFolders) {
+            const folderPath = `devices/${folderName}/`;
+            const details = await readJson<MerakiDeviceDetails>(`${folderPath}details.json`);
+            if (details) {
+                const deviceConfig: Partial<DeviceConfigBackup> = { general: details };
+                
+                if (details.model.startsWith("MS")) {
+                    deviceConfig.switchPorts = await readJson(`${folderPath}switch_ports.json`) || [];
+                    deviceConfig.routingInterfaces = await readJson(`${folderPath}switch_routing_interfaces.json`) || [];
+                    deviceConfig.staticRoutes = await readJson(`${folderPath}switch_routing_staticRoutes.json`) || [];
+                }
+                
+                backup.devices!.push({ serial: details.serial, config: deviceConfig as DeviceConfigBackup });
+                log(`    - Found config for ${details.name} (${details.serial})`);
+            }
+        }
+    }
+
+    // 3. Get Network Configurations
+    const networkFiles = zip.folder('networks');
+    if (networkFiles) {
+        log("  - Scanning for network configurations...");
+        const networkFolders: string[] = [];
+        networkFiles.forEach((relativePath) => {
+            const pathParts = relativePath.split('/');
+            if (pathParts.length > 1 && pathParts[0] && !networkFolders.includes(pathParts[0])) {
+                networkFolders.push(pathParts[0]);
+            }
+        });
+
+        for (const folderName of networkFolders) {
+            const folderPath = `networks/${folderName}/`;
+            const netDetails = await readJson<MerakiNetwork>(`${folderPath}details.json`);
+            if (netDetails) {
+                const networkId = netDetails.id;
+                log(`    - Found network: ${netDetails.name} (${networkId})`);
+                
+                const networkBackup: Partial<NetworkConfigBackup> = {
+                    groupPolicies: await readJson(`${folderPath}groupPolicies.json`) || undefined,
+                    ssids: await readJson(`${folderPath}wireless_ssids.json`) || undefined,
+                    applianceVlans: await readJson(`${folderPath}appliance_vlans.json`) || undefined,
+                    applianceL3FirewallRules: await readJson(`${folderPath}appliance_firewall_l3FirewallRules.json`) || undefined,
+                    siteToSiteVpnSettings: await readJson(`${folderPath}appliance_vpn_siteToSiteVpn.json`) || undefined,
+                    syslogServers: (await readJson<{servers: any[]}>(`${folderPath}syslogServers.json`))?.servers,
+                    snmp: await readJson(`${folderPath}snmp.json`) || undefined,
+                    staticRoutes: await readJson(`${folderPath}appliance_staticRoutes.json`) || undefined,
+                    applianceL7FirewallRules: await readJson(`${folderPath}appliance_firewall_l7FirewallRules.json`) || undefined,
+                    intrusionSettings: await readJson(`${folderPath}appliance_security_intrusion.json`) || undefined,
+                    malwareSettings: await readJson(`${folderPath}appliance_security_malware.json`) || undefined,
+                    switchAcls: await readJson(`${folderPath}switch_accessControlLists.json`) || undefined,
+                    switchSettings: await readJson(`${folderPath}switch_settings.json`) || undefined,
+                    wirelessRfProfiles: await readJson(`${folderPath}wireless_rfProfiles.json`) || undefined,
+                };
+
+                // Add per-SSID data if SSIDs exist
+                if (networkBackup.ssids && networkBackup.ssids.length > 0) {
+                    const ssidL3Rules: Record<number, any> = {};
+                    const ssidL7Rules: Record<number, any> = {};
+                    const ssidTrafficShaping: Record<number, any> = {};
+
+                    for(const ssid of networkBackup.ssids){
+                        const l3 = await readJson(`${folderPath}wireless_ssid_${ssid.number}_firewall_l3FirewallRules.json`);
+                        if(l3) ssidL3Rules[ssid.number] = l3;
+                        const l7 = await readJson(`${folderPath}wireless_ssid_${ssid.number}_firewall_l7FirewallRules.json`);
+                        if(l7) ssidL7Rules[ssid.number] = l7;
+                        const ts = await readJson(`${folderPath}wireless_ssid_${ssid.number}_trafficShaping_rules.json`);
+                        if(ts) ssidTrafficShaping[ssid.number] = ts;
+                    }
+                    networkBackup.ssidFirewallL3Rules = ssidL3Rules;
+                    networkBackup.ssidFirewallL7Rules = ssidL7Rules;
+                    networkBackup.ssidTrafficShaping = ssidTrafficShaping;
+                }
+
+                backup.networkConfigs![networkId] = networkBackup;
+            }
+        }
+    }
+
+    log("--- ✅ Backup file analysis complete. ---");
+    return backup as BackupFile;
 };

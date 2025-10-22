@@ -6,6 +6,7 @@ import { ModeSelectionScreen } from './components/ModeSelectionScreen';
 // FIX: Import MigrationWizard component. The file was missing, it is now created.
 import { MigrationWizard } from './components/MigrationWizard';
 import { BackupWizard } from './components/BackupWizard';
+import { RestoreWizard } from './components/RestoreWizard';
 import { Toaster } from './components/ui/sonner';
 import { Button } from './components/ui/button';
 import { LogOut, LayoutGrid } from 'lucide-react';
@@ -18,9 +19,14 @@ import { PricingSection } from "./components/home/PricingSection";
 import { CTASection } from "./components/home/CTASection";
 import { Footer } from "./components/home/Footer";
 
-type ToolMode = 'selection' | 'migration' | 'backup' | 'restore';
+import { PrivacyPolicy } from "./components/home/PrivacyPolicy";
+import { TermsOfService } from "./components/home/TermsOfService";
 
-function App() {
+type ToolMode = 'selection' | 'migration' | 'backup' | 'restore';
+type Page = "home" | "privacy" | "terms";
+
+export default function App() {
+  const [currentPage, setCurrentPage] = useState<Page>("home");
   const [user, setUser] = useState<User | null>(null);
   const [isHome, setIsHome] = useState<boolean>(true);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -31,6 +37,14 @@ function App() {
     setUser(currentUser);
     setIsInitializing(false);
   }, []);
+
+  if (currentPage === "privacy") {
+    return <PrivacyPolicy onBack={() => setCurrentPage("home")} />;
+  }
+
+  if (currentPage === "terms") {
+    return <TermsOfService onBack={() => setCurrentPage("home")} />;
+  }
 
   const handleLogin = (loggedInUser: User) => {
     auth.login(loggedInUser);
@@ -55,13 +69,8 @@ function App() {
       case 'backup':
         return <BackupWizard />;
       case 'restore':
-        return (
-            <div className="text-center p-8 bg-card rounded-lg border max-w-2xl mx-auto">
-                <h2 className="text-2xl font-bold">Restore Feature</h2>
-                <p className="text-muted-foreground mt-2">This feature is under development and will be available soon.</p>
-            </div>
-        );
-      case 'selection':
+        return <RestoreWizard />;
+       case 'selection':
       default:
         return <ModeSelectionScreen onSelectMode={handleSelectToolMode} />;
     }
@@ -82,14 +91,13 @@ function App() {
           <HowItWorks />
           <PricingSection />
           <CTASection />
-          <Footer />
+          <Footer onNavigate={setCurrentPage}/>
         </div>
       )
     } else {
       return <LoginScreen onLogin={handleLogin} />;
     }
   }
-
   return (
     <div className="min-h-screen bg-[var(--color-surface-subtle)] text-[var(--color-text-primary)]">
         <header className="flex items-center justify-between p-4 border-b border-[var(--color-border-primary)] bg-[var(--color-surface)] shadow-sm sticky top-0 z-10">
@@ -121,4 +129,4 @@ function App() {
   );
 }
 
-export default App;
+//export default App;
